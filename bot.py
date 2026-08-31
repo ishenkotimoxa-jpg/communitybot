@@ -59,7 +59,7 @@ CATEGORIES = (
     ("career", "💼 Карьерные сообщества"),
     ("media", "🎥 Медиа"),
     ("science", "🔬 Наука"),
-    ("kid", "🌍 КИД"),
+    ("kid", "🌍 Клуб интернациональной дружбы"),
 )
 
 CATEGORY_NAMES = dict(CATEGORIES)
@@ -183,7 +183,7 @@ def load_organizations() -> tuple[
             "category": category_id,
         }
 
-        for field_name in ("description", "workload", "how_to_join"):
+        for field_name in ("description", "how_to_join"):
             field_value = item.get(field_name)
             if field_value is not None and not isinstance(field_value, str):
                 raise RuntimeError(
@@ -456,7 +456,6 @@ def category_menu(category_id: str, page: int) -> InlineKeyboardMarkup:
 def organization_card_text(organization: dict[str, Any]) -> str:
     description = organization.get("description", "Информация уточняется.")
     activities = organization.get("activities", ())
-    workload = organization.get("workload", "Информация уточняется.")
     links = organization.get("links", ())
     how_to_join = organization.get(
         "how_to_join",
@@ -476,7 +475,6 @@ def organization_card_text(organization: dict[str, Any]) -> str:
         f"Направление: {CATEGORY_NAMES[organization['category']]}\n\n"
         f"{description}\n\n"
         f"Что ты будешь делать:\n{activity_text}\n\n"
-        f"Занятость: {workload}\n\n"
         f"Как вступить: {how_to_join}\n\n"
         f"Контакты: {contact_text}"
     )

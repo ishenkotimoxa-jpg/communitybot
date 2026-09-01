@@ -25,6 +25,7 @@ from quiz_flow import (
     available_answer_indexes,
     next_question_id,
 )
+from quiz_statistics import record_quiz_results
 
 
 ENV_FILE = Path(__file__).with_name(".env")
@@ -33,6 +34,9 @@ QUESTIONS_FILE = Path(__file__).with_name("questions.json")
 load_dotenv(ENV_FILE)
 
 BOT_TOKEN = (os.getenv("BOT_TOKEN") or "").strip()
+STATISTICS_FILE = Path(
+    os.getenv("STATISTICS_FILE") or Path(__file__).with_name("statistics.json")
+)
 
 if not BOT_TOKEN:
     raise RuntimeError(f"Не найден BOT_TOKEN в файле {ENV_FILE}")
@@ -688,6 +692,14 @@ async def quiz_answer_handler(
             QUESTIONS,
             ORGANIZATIONS,
             user_id=callback.from_user.id,
+        )
+        record_quiz_results(
+            STATISTICS_FILE,
+            [result.organization_id for result in results],
+            {
+                result.organization_id: ORGANIZATIONS_BY_ID[result.organization_id]["name"]
+                for result in results
+            },
         )
         await state.clear()
         if isinstance(callback.message, Message):

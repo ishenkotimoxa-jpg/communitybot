@@ -54,6 +54,11 @@ WELCOME_TEXT = (
     "или пройти небольшой тест и найти то, что подходит именно тебе."
 )
 
+ORGANIZATIONS_MENU_TEXT = (
+    "📚 Объединения\n\n"
+    "Посмотри все объединения или пройди тест, чтобы подобрать подходящее."
+)
+
 CATEGORIES = (
     ("community", "👥 Общественные"),
     ("sport", "🏆 Спорт"),
@@ -342,6 +347,19 @@ def main_menu() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
+                    text="📚 Объединения",
+                    callback_data="organizations",
+                )
+            ],
+        ]
+    )
+
+
+def organizations_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
                     text="🎯 Подобрать объединение",
                     callback_data="start_quiz",
                 )
@@ -350,6 +368,12 @@ def main_menu() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="📚 Все объединения",
                     callback_data="catalog",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Главное меню",
+                    callback_data="back_to_main",
                 )
             ],
         ]
@@ -370,7 +394,7 @@ def categories_menu() -> InlineKeyboardMarkup:
         for category_id, category_name in CATEGORIES
     ]
     keyboard.append(
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_main")]
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="organizations")]
     )
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
@@ -629,6 +653,19 @@ async def start_handler(message: Message, state: FSMContext) -> None:
     )
 
 
+@dp.callback_query(F.data == "organizations")
+async def organizations_button_handler(
+    callback: CallbackQuery, state: FSMContext
+) -> None:
+    await state.clear()
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await callback.message.edit_text(
+            ORGANIZATIONS_MENU_TEXT,
+            reply_markup=organizations_menu(),
+        )
+
+
 @dp.callback_query(F.data == "start_quiz")
 async def quiz_button_handler(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
@@ -735,8 +772,8 @@ async def quiz_cancel_handler(callback: CallbackQuery, state: FSMContext) -> Non
     await callback.answer("Опрос отменён")
     if isinstance(callback.message, Message):
         await callback.message.edit_text(
-            WELCOME_TEXT,
-            reply_markup=main_menu(),
+            ORGANIZATIONS_MENU_TEXT,
+            reply_markup=organizations_menu(),
         )
 
 

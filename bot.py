@@ -17,6 +17,7 @@ from aiogram.types import (
     Message,
 )
 from dotenv import load_dotenv
+from support import Support
 
 from matching import MatchResult, recommend_organizations, validate_matching_config
 from quiz_flow import (
@@ -25,7 +26,6 @@ from quiz_flow import (
     available_answer_indexes,
     next_question_id,
 )
-from quiz_statistics import record_quiz_results
 
 
 ENV_FILE = Path(__file__).with_name(".env")
@@ -34,9 +34,7 @@ QUESTIONS_FILE = Path(__file__).with_name("questions.json")
 load_dotenv(ENV_FILE)
 
 BOT_TOKEN = (os.getenv("BOT_TOKEN") or "").strip()
-STATISTICS_FILE = Path(
-    os.getenv("STATISTICS_FILE") or Path(__file__).with_name("statistics.json")
-)
+SUPPORT_CHAT_ID = (os.getenv("SUPPORT_CHAT_ID") or "").strip()
 
 if not BOT_TOKEN:
     raise RuntimeError(f"Не найден BOT_TOKEN в файле {ENV_FILE}")
@@ -46,11 +44,16 @@ dp = Dispatcher(
     storage=MemoryStorage(),
     events_isolation=SimpleEventIsolation(),
 )
+support = Support(
+    chat_id=int(SUPPORT_CHAT_ID) if SUPPORT_CHAT_ID else None,
+    database=Path(__file__).with_name("support.sqlite3"),
+)
+dp.include_router(support.router)
 
 WELCOME_TEXT = (
     "👋 Привет!\n\n"
-    "Это бот Департамента по молодежной политике НИЯУ МИФИ.\n\n"
-    "Здесь ты можешь узнать больше о деятельности нашего департамента, об объединениях "
+    "Это бот Объединенного Совета Обучающихся НИЯУ МИФИ.\n\n"
+    "Здесь ты можешь узнать больше о деятельности нашего студенческого актива, о мероприятиях, об объединениях "
     "или пройти небольшой тест и найти то, что подходит именно тебе."
 )
 
@@ -351,6 +354,12 @@ def main_menu() -> InlineKeyboardMarkup:
                     callback_data="organizations",
                 )
             ],
+            [
+                InlineKeyboardButton(
+                    text="❓ Часто задаваемые вопросы",
+                    callback_data="faq",
+                )
+            ],
         ]
     )
 
@@ -644,7 +653,7 @@ def quiz_complete_menu(results: tuple[MatchResult, ...]) -> InlineKeyboardMarkup
     )
 
 
-@dp.message(CommandStart())
+@dp.message(CommandStart(), F.chat.type == "private")
 async def start_handler(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer(
@@ -729,14 +738,6 @@ async def quiz_answer_handler(
             QUESTIONS,
             ORGANIZATIONS,
             user_id=callback.from_user.id,
-        )
-        record_quiz_results(
-            STATISTICS_FILE,
-            [result.organization_id for result in results],
-            {
-                result.organization_id: ORGANIZATIONS_BY_ID[result.organization_id]["name"]
-                for result in results
-            },
         )
         await state.clear()
         if isinstance(callback.message, Message):

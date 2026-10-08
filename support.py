@@ -17,34 +17,10 @@ from aiogram.types import (
 )
 
 
+from faq import FAQ_CATEGORIES, FAQ_TEXT, faq_menu
+
+
 logger = logging.getLogger(__name__)
-
-FAQ_TEXT = (
-    "❓ Часто задаваемые вопросы\n\n"
-    "1. Как выбрать студенческое объединение?\n"
-    "Открой «Объединения»: там можно посмотреть каталог по направлениям "
-    "или пройти тест и получить рекомендации по своим интересам.\n\n"
-    "2. Как вступить в объединение?\n"
-    "Открой его карточку в каталоге. Посмотри описание, информацию о вступлении "
-    "и ссылки. Если информации не хватает, нажми «Задать вопрос» — команда ОСО поможет разобраться.\n\n"
-    "3. Нужен ли опыт для участия?\n"
-    "Требования зависят от объединения и выбранной деятельности. "
-    "Уточни у его команды, есть ли занятия для начинающих и нужен ли отбор.\n\n"
-    "4. Где узнать о встречах и мероприятиях?\n"
-    "Посмотри ссылки в карточке интересующего объединения: в его сообществах "
-    "можно искать анонсы и уточнять расписание у организаторов.\n\n"
-    "5. Как связаться с командой ОСО?\n"
-    "Нажми «Задать вопрос» и отправь сообщение. Мы передадим его команде, "
-    "а ответ придёт сюда, в бот, ответом на твой вопрос."
-)
-
-
-def faq_menu() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✍️ Задать вопрос", callback_data="ask_question")],
-        [InlineKeyboardButton(text="⬅️ Главное меню", callback_data="back_to_main")],
-    ])
-
 
 def cancel_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -97,6 +73,8 @@ class Support:
         self.store = QuestionStore(database) if chat_id is not None else None
         self.router = Router(name="support")
         self.router.callback_query.register(self.show_faq, F.data == "faq")
+        self.router.callback_query.register(self.show_faq_category, F.data.startswith("faq_category:"))
+        self.router.callback_query.register(self.show_faq_answer, F.data.startswith("faq_answer:"))
         self.router.callback_query.register(self.ask_question, F.data == "ask_question")
         self.router.message.register(
             self.show_chat_id, Command("chat_id"), F.chat.type.in_({"group", "supergroup"}),
@@ -117,6 +95,35 @@ class Support:
         await callback.answer()
         if isinstance(callback.message, Message):
             await callback.message.edit_text(FAQ_TEXT, reply_markup=faq_menu())
+
+    async def show_faq_category(self, callback: CallbackQuery, state: FSMContext) -> None:
+        category_id = (callback.data or "").removeprefix("faq_category:")
+        category = FAQ_CATEGORIES.get(category_id)
+        if category is None:
+            await callback.answer("Тема не найдена. Открой раздел вопросов заново.", show_alert=True)
+            return
+        await state.clear()
+        await callback.answer()
+        if isinstance(callback.message, Message):
+            await callback.message.edit_text(
+                f"{category['title']}\n\nВыбери интересующий вопрос:",
+                reply_markup=faq_menu(category_id),
+            )
+
+    async def show_faq_answer(self, callback: CallbackQuery, state: FSMContext) -> None:
+        parts = (callback.data or "").split(":")
+        category = FAQ_CATEGORIES.get(parts[1]) if len(parts) == 3 else None
+        question = category["questions"].get(parts[2]) if category else None
+        if question is None:
+            await callback.answer("Вопрос не найден. Открой раздел вопросов заново.", show_alert=True)
+            return
+        await state.clear()
+        await callback.answer()
+        if isinstance(callback.message, Message):
+            await callback.message.edit_text(
+                f"{category['title']}\n\n❓ {question[0]}\n\n{question[1]}",
+                reply_markup=faq_menu(parts[1], parts[2]),
+            )
 
     async def ask_question(self, callback: CallbackQuery, state: FSMContext) -> None:
         if not isinstance(callback.message, Message):

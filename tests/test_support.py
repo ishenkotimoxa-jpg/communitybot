@@ -13,6 +13,7 @@ from aiogram.methods import CopyMessage, SendMessage
 from aiogram.types import Message, Update
 
 from support import FAQ_TEXT, QuestionStore, Support, SupportState
+from faq import FAQ_CATEGORIES, faq_menu
 
 
 def message(chat_id=123, message_id=10, text="Как вступить?"):
@@ -119,7 +120,44 @@ class SupportTests(unittest.IsolatedAsyncioTestCase):
         self.state.clear.assert_awaited_once()
         args = callback.message.edit_text.call_args
         self.assertEqual(args.args[0], FAQ_TEXT)
-        self.assertEqual(args.kwargs["reply_markup"].inline_keyboard[0][0].callback_data, "ask_question")
+        self.assertIn("ask_question", [b.callback_data for row in args.kwargs["reply_markup"].inline_keyboard for b in row])
+
+    async def test_faq_navigation(self):
+        for category_id, category in FAQ_CATEGORIES.items():
+            callback = AsyncMock()
+            callback.message = message()
+            callback.data = f"faq_category:{category_id}"
+            await self.support.show_faq_category(callback, self.state)
+            self.assertIn(category["title"], callback.message.edit_text.call_args.args[0])
+            for question_id, (title, answer) in category["questions"].items():
+                callback.data = f"faq_answer:{category_id}:{question_id}"
+                await self.support.show_faq_answer(callback, self.state)
+                call = callback.message.edit_text.call_args
+                self.assertIn(title, call.args[0])
+                self.assertIn(answer, call.args[0])
+                self.assertLess(len(call.args[0]), 4096)
+                for menu in (faq_menu(category_id), call.kwargs["reply_markup"]):
+                    callbacks = [b.callback_data for row in menu.inline_keyboard for b in row if b.callback_data]
+                    self.assertIn("ask_question", callbacks)
+                    self.assertIn("faq", callbacks)
+                    self.assertIn("back_to_main", callbacks)
+                    self.assertTrue(all(len(data.encode()) <= 64 for data in callbacks))
+                self.assertIn(f"faq_category:{category_id}", callbacks)
+
+    async def test_invalid_faq_links_preserve_state(self):
+        for data, handler in (
+            ("faq_category:missing", self.support.show_faq_category),
+            ("faq_answer:missing:question", self.support.show_faq_answer),
+            ("faq_answer:help:missing", self.support.show_faq_answer),
+            ("faq_answer:help", self.support.show_faq_answer),
+        ):
+            callback = AsyncMock()
+            callback.message = message()
+            callback.data = data
+            await handler(callback, self.state)
+            self.assertTrue(callback.answer.call_args.kwargs["show_alert"])
+            callback.message.edit_text.assert_not_awaited()
+        self.state.clear.assert_not_awaited()
 
     async def test_asking_question_enters_waiting_state(self):
         callback = AsyncMock()

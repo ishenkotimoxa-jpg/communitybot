@@ -18,6 +18,7 @@ from aiogram.types import (
 )
 from dotenv import load_dotenv
 from support import Support
+from faq import HELP_WINDOW_URL
 
 from matching import MatchResult, recommend_organizations, validate_matching_config
 from quiz_flow import (
@@ -61,6 +62,21 @@ ORGANIZATIONS_MENU_TEXT = (
     "📚 Объединения\n\n"
     "Посмотри все объединения или пройди тест, чтобы подобрать подходящее."
 )
+
+HELP_WINDOW_TEXT = (
+    "🤝 Единое окно помощи\n\n"
+    "Здесь вам всегда помогут и поддержат 🧡\n\n"
+    "Появились проблемы, которые вы не можете решить самостоятельно? "
+    "Обратитесь в онлайн-приёмную проректора по молодёжной политике НИЯУ МИФИ.\n\n"
+    "Сюда также можно написать свои идеи и предложения по улучшению жизни в вузе.\n\n"
+    "Нажмите кнопку ниже, чтобы перейти в онлайн-приёмную.\n\n"
+    "Как найти её самостоятельно:\n"
+    "1. Зайдите на home.mephi.ru.\n"
+    "2. Выберите раздел «Сервисы».\n"
+    "3. Откройте «Прочее».\n"
+    "4. Выберите «Онлайн приемная проректора по молодёжной политике»."
+)
+
 
 CATEGORIES = (
     ("community", "👥 Общественные"),
@@ -360,8 +376,16 @@ def main_menu() -> InlineKeyboardMarkup:
                     callback_data="faq",
                 )
             ],
+            [InlineKeyboardButton(text="🤝 Единое окно помощи", callback_data="help_window")],
         ]
     )
+
+
+def help_window_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🧡 Перейти в онлайн-приёмную", url=HELP_WINDOW_URL)],
+        [InlineKeyboardButton(text="⬅️ Главное меню", callback_data="back_to_main")],
+    ])
 
 
 def organizations_menu() -> InlineKeyboardMarkup:
@@ -660,6 +684,14 @@ async def start_handler(message: Message, state: FSMContext) -> None:
         WELCOME_TEXT,
         reply_markup=main_menu(),
     )
+
+
+@dp.callback_query(F.data == "help_window")
+async def help_window_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await callback.message.edit_text(HELP_WINDOW_TEXT, reply_markup=help_window_menu())
 
 
 @dp.callback_query(F.data == "organizations")
